@@ -155,11 +155,34 @@ echo ""
 echo "Creating directories..."
 mkdir -p searxng n8n/backup shared supabase/volumes/{api,db,logs,functions/main}
 
+# Download Supabase configuration files
+echo "Downloading Supabase configuration files..."
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/api/kong.yml -o supabase/volumes/api/kong.yml
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/db/realtime.sql -o supabase/volumes/db/realtime.sql
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/db/webhooks.sql -o supabase/volumes/db/webhooks.sql
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/db/roles.sql -o supabase/volumes/db/roles.sql
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/db/jwt.sql -o supabase/volumes/db/jwt.sql
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/db/logs.sql -o supabase/volumes/db/logs.sql
+curl -sL https://raw.githubusercontent.com/supabase/supabase/master/docker/volumes/logs/vector.yml -o supabase/volumes/logs/vector.yml
+
+# Create edge function placeholder
+cat > supabase/functions/main/index.ts << 'EOF'
+// Main Supabase Edge Function handler
+console.log("Supabase Edge Functions initialized");
+EOF
+
+echo -e "${GREEN}✓ Supabase configuration downloaded${NC}"
+
 # Copy SearXNG config if doesn't exist
 if [ ! -f searxng/settings.yml ]; then
     if [ -f searxng/settings-base.yml ]; then
         cp searxng/settings-base.yml searxng/settings.yml
         echo -e "${GREEN}✓ SearXNG configuration created${NC}"
+    else
+        # Download default SearXNG settings
+        echo "Downloading SearXNG configuration..."
+        curl -sL https://raw.githubusercontent.com/searxng/searxng/master/searx/settings.yml -o searxng/settings.yml
+        echo -e "${GREEN}✓ SearXNG configuration downloaded${NC}"
     fi
 fi
 
