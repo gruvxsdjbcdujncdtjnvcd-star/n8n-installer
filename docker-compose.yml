@@ -276,6 +276,8 @@ services:
       options:
         max-size: "1m"
         max-file: "1"
+    depends_on:
+      - caddy
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
