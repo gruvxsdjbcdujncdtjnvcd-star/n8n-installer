@@ -1,0 +1,88 @@
+{
+    # Cloudflare Tunnel mode - no auto HTTPS
+    auto_https off
+    admin localhost:2019
+}
+
+# Unified HTTP listener for all services
+http://:80 {
+    # N8N
+    @n8n host {$N8N_HOSTNAME}
+    handle @n8n {
+        reverse_proxy n8n:5678
+    }
+
+    # Langfuse
+    @langfuse host {$LANGFUSE_HOSTNAME}
+    handle @langfuse {
+        reverse_proxy langfuse-web:3000
+    }
+
+    # Qdrant
+    @qdrant host {$QDRANT_HOSTNAME}
+    handle @qdrant {
+        reverse_proxy qdrant:6333
+    }
+
+    # Supabase
+    @supabase host {$SUPABASE_HOSTNAME}
+    handle @supabase {
+        reverse_proxy supabase-kong:8000
+    }
+
+    # SearXNG with basic auth
+    @searxng host {$SEARXNG_HOSTNAME}
+    handle @searxng {
+        @protected not remote_ip 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10
+
+        basic_auth @protected {
+            {$SEARXNG_USERNAME} {$SEARXNG_PASSWORD_HASH}
+        }
+
+        encode zstd gzip
+
+        @api {
+            path /config
+            path /healthz
+            path /stats/errors
+            path /stats/checker
+        }
+        @search {
+            path /search
+        }
+        @imageproxy {
+            path /image_proxy
+        }
+        @static {
+            path /static/*
+        }
+
+        header {
+            Content-Security-Policy "upgrade-insecure-requests; default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; form-action 'self' https://github.com/searxng/searxng/issues/new; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; connect-src 'self' https://overpass-api.de; img-src * data:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://www.deezer.com https://www.mixcloud.com https://w.soundcloud.com https://embed.spotify.com;"
+            Permissions-Policy "accelerometer=(),camera=(),geolocation=(),gyroscope=(),magnetometer=(),microphone=(),payment=(),usb=()"
+            Referrer-Policy "no-referrer"
+            Strict-Transport-Security "max-age=31536000"
+            X-Content-Type-Options "nosniff"
+            X-Robots-Tag "noindex, noarchive, nofollow"
+            -Server
+        }
+
+        header @api {
+            Access-Control-Allow-Methods "GET, OPTIONS"
+            Access-Control-Allow-Origin "*"
+        }
+
+        route {
+            header Cache-Control "max-age=0, no-store"
+            header @search Cache-Control "max-age=5, private"
+            header @imageproxy Cache-Control "max-age=604800, public"
+            header @static Cache-Control "max-age=31536000, public, immutable"
+        }
+
+        reverse_proxy searxng:8080 {
+            header_up X-Forwarded-Port {http.request.port}
+            header_up X-Real-IP {http.request.remote.host}
+            header_up Connection "close"
+        }
+    }
+}
